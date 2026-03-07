@@ -1,0 +1,9 @@
+[submodule "SD-model"]
+	path = SD-model
+	url = http://github.com/networkgeometry/SD-model
+[submodule "mercator"]
+	path = mercator
+	url = http://github.com/networkgeometry/mercator
+[submodule "epidemics-tfg"]
+	path = epidemics-tfg
+	url = http://github.com/AdriRed/epidemics-tfg
