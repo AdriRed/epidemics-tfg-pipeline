@@ -1,3 +1,5 @@
+# airports data file from https://github.com/jpatokal/openflights/blob/master/data/routes.dat
+
 import csv
 from collections import defaultdict
 import argparse
