@@ -1,0 +1,12 @@
+{
+    "recommendations": [
+        "ms-toolsai.jupyter",
+        "fortran-lang.linter-gfortran",
+        "ms-python.python",
+        "ms-python.vscode-python-envs",
+        "ms-python.debugpy",
+        "ms-python.vscode-pylance",
+        "mkhl.direnv",
+        "ms-vscode.cpptools"
+    ]
+}
