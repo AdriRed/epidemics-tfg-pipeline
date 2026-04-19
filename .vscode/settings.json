@@ -1,0 +1,9 @@
+{
+    "[FortranFreeForm]": {
+        "editor.insertSpaces": true,
+        "editor.indentSize": 3,
+        "editor.rulers": [
+            132
+        ]
+    },
+}
