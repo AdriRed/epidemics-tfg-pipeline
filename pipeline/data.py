@@ -1,5 +1,9 @@
+import numpy as np
+import pandas as pd
+import networkx as nx
+import typing as t
 
-def read_hyperbolic_data(archivo_coords, archivo_edges):
+def read_hyperbolic_data(archivo_coords: str, archivo_edges: str) -> t.Tuple[nx.Graph, pd.DataFrame, dict]:
     """
     Lee el grafo y las coordenadas hiperbólicas del formato S1/H2
     """
@@ -45,3 +49,6 @@ def read_hyperbolic_data(archivo_coords, archivo_edges):
     df['Disc.Y'] = df['Disc.Radius']*np.sin(df['Inf.Theta'])
     
     return G, df, params
+
+def get_most_popular_node(G: nx.Graph) -> str:
+    return max(G.degree(), key=lambda x: x[1])[0]

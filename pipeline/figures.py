@@ -1,12 +1,9 @@
 import pandas as pd
 import networkx as nx
 import numpy as np
+import matplotlib.pyplot as plt
 
-
-def mercator_disc(data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R=None, c=None, title: str = None):
-    import matplotlib.pyplot as plt
-    plt.rcParams['text.usetex'] = False
-    fig, ax = plt.subplots(1, 1, figsize=(14, 12), dpi=100)
+def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R: float =None, c: float =None, title: str = None):
     kappa_vals = []
     positions = {v: (x, y) for _, (v, x, y) in data[['Vertex', 'Disc.X', 'Disc.Y']].iterrows()}
         
@@ -18,19 +15,16 @@ def mercator_disc(data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph 
             xb, yb = positions[b]
             ax.add_line(plt.Line2D([xa, xb], [ya, yb], linewidth=0.05, color='#00000015'))
     x_orig, y_orig = zip(*positions.values())
-    max_val_x = np.max(np.abs(x_orig))*1.1
-    max_val_y = np.max(np.abs(y_orig))*1.1
-    maxval = np.max([max_val_x, max_val_y])
+    
     scatter = ax.scatter(x_orig, y_orig, c=kappa_vals, cmap='viridis', zorder=10000,
-                        s=15, alpha=0.5, edgecolors='black', linewidth=0.3, vmin=-1, vmax=1)
+                        s=15, alpha=0.5, edgecolors='black', linewidth=0.3)
     # circle = plt.Circle((0, 0), 1, fill=False, color='red', linestyle='--')
     # ax.add_patch(circle)
     
     for mark_node in mark_nodes:
         mark_data = data[data['Vertex'] == mark_node].iloc[0]
         ax.plot(mark_data['Disc.X'], mark_data['Disc.Y'], 'r*', markersize=15, markeredgecolor='black', zorder=100000)
-    ax.set_xlim(-maxval, maxval)
-    ax.set_ylim(-maxval, maxval)
+    
 
     if isolines_nodes:
         for node in isolines_nodes:
@@ -38,15 +32,30 @@ def mercator_disc(data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph 
             r, theta = center['Disc.Radius'], center['Inf.Theta']
             dibujar_isolineas(ax, r, theta, R=R, c=c, resolucion=3000)
 
-    # ax.set_aspect('equal')
-    ax.grid(True, alpha=0.3)
-    ax.legend()
     if (title):
         ax.set_title(title)
+
+    # ax.set_aspect('equal')
+    ax.grid(True, alpha=0.3)
+    return scatter
+
+def mercator_disc(data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R=None, c=None, title: str = None):
+    import matplotlib.pyplot as plt
+    plt.rcParams['text.usetex'] = False
+    fig, ax = plt.subplots(1, 1, figsize=(14, 12), dpi=100)
+    max_val_x = np.max(np.abs(data['Disc.X']))*1.1
+    max_val_y = np.max(np.abs(data['Disc.Y']))*1.1
+    maxval = np.max([max_val_x, max_val_y])
+
+    ax.set_xlim(-maxval, maxval)
+    ax.set_ylim(-maxval, maxval)
+
+    mercator_disc_ax(ax, data, mark_nodes, net, isolines_nodes, R, c)
     # plt.colorbar(scatter, ax=ax, label='log10(κ)')
     plt.show()
     plt.close(fig)
     plt.rcParams['text.usetex'] = True
+    
 
 
 def dibujar_isolineas(ax, r_centro, theta_centro, R=1, c=-1, zeta=1.0,

@@ -5,3 +5,5 @@ pipeline-output-s1h2/*
 figures/*
 
 **__pycache__**
+
+generated-nets/*
