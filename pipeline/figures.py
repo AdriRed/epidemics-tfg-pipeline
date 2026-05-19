@@ -124,12 +124,17 @@ def dibujar_isolineas(ax, r_centro, theta_centro, R=1, c=-1, zeta=1.0,
 def mercator_epidemic_disc(data: pd.DataFrame, susceptible_coords, infected_coords, recovered_coords, filename: str = None, time:str = None):
     import numpy as np
     import matplotlib.pyplot as plt
-    from matplotlib.figure import Figure
-    from matplotlib.backends.backend_agg import FigureCanvasAgg 
     import gc
     plt.rcParams['text.usetex'] = False
-    fig = Figure(figsize=(14, 12), dpi=100)
-    ax = fig.add_subplot(111)
+    fig, ax = None, None
+    if (filename):
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_agg import FigureCanvasAgg 
+
+        fig = Figure(figsize=(14, 12), dpi=100)
+        ax = fig.add_subplot(111)
+    else:
+        fig, ax = plt.subplots(figsize=(14, 12), dpi=300)
     x_orig_white, y_orig_white = [], []
     x_orig_pink, y_orig_pink = [], []
     x_orig_red, y_orig_red = [], [] 
@@ -140,11 +145,10 @@ def mercator_epidemic_disc(data: pd.DataFrame, susceptible_coords, infected_coor
     if len(susceptible_coords) > 0:
         x_orig_white, y_orig_white = zip(*susceptible_coords)
 
-    max_val_x = np.max(np.abs(data['Disc.X']))*1.1
-    max_val_y = np.max(np.abs(data['Disc.Y']))*1.1
+    max_val = np.max(np.abs([data['Disc.X'], data['Disc.Y']]))*1.1
 
-    ax.set_xlim(-max_val_x, max_val_x)
-    ax.set_ylim(-max_val_y, max_val_y)
+    ax.set_xlim(-max_val, max_val)
+    ax.set_ylim(-max_val, max_val)
     ax.scatter(x_orig_white, y_orig_white, s=15, alpha=0.5, linewidth=0.3, c='white', edgecolors='black')
     ax.scatter(x_orig_pink, y_orig_pink, alpha=0.1, s=15, c='blue')
     ax.scatter(x_orig_red, y_orig_red, s=15, c='red')
@@ -158,10 +162,5 @@ def mercator_epidemic_disc(data: pd.DataFrame, susceptible_coords, infected_coor
         canvas.print_png(filename)   # Guarda directamente
     else:
         plt.show()
-        fig.clf()
-        plt.cla()      # 1. Limpia los ejes actuales
-        plt.clf()      # 2. Limpia la figura actual
-        plt.close(fig) # 3. Cierra la figura específica
-        plt.close('all')
     plt.rcParams['text.usetex'] = True
     gc.collect()

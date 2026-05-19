@@ -1,11 +1,15 @@
 import pandas as pd
+import networkx as nx
+import typing as t
 def mercator_disc_epidemic_anim(
-    df,
-    events,
-    epidemics_fig_output,
-    step=0.1,
-    t_start=None,
-    t_end=None,
+    df: pd.DataFrame,
+    events: pd.DataFrame,
+    epidemics_fig_output: str,
+    step: float=0.1,
+    t_start: float=None,
+    t_end: float=None,
+    start_node: str=None,
+    lorentz_boost: bool = False
 ):
     """
     Simula una epidemia en el disco hiperbólico y genera frames para un GIF/animación.
@@ -35,6 +39,9 @@ def mercator_disc_epidemic_anim(
     import math
     from tqdm import tqdm
     from . import figures as figs
+    from . import boost as boost
+    from . import data as data
+    import numpy as np
     # ---------- Limpieza y preparación del directorio ----------
     if os.path.exists(epidemics_fig_output):
         shutil.rmtree(epidemics_fig_output)
@@ -67,38 +74,53 @@ def mercator_disc_epidemic_anim(
     print("Simulando evolución de estados...")
     snapshots = []  # cada elemento: (t, list(susc), list(inf), list(rec))
     snap = None
+    if (lorentz_boost):
+        selected = df[df['Vertex'] == start_node].iloc[0]
+        r, theta = selected['Disc.Radius'], selected['Inf.Theta']
+
+        r_changed, theta_changed = boost.centrar_en_origen(df['Disc.Radius'], df['Inf.Theta'], r, theta)
+        df2 = pd.DataFrame()
+        df2['Vertex'] = df['Vertex']
+        df2['Inf.Kappa'] = df['Inf.Kappa']
+        df2['Disc.Radius'] = r_changed
+        df2['Inf.Theta'] = theta_changed
+        df2['Disc.X'] = df2['Disc.Radius']*np.cos(df2['Inf.Theta'])
+        df2['Disc.Y'] = df2['Disc.Radius']*np.sin(df2['Inf.Theta'])
+        df = df2
+
     for i in tqdm(range(n_steps), desc="Simulación"):
         t = t_start + (i + 1) * step
 
         # Procesar eventos hasta t
         snap = get_snapshot(df, events_sorted, t, snap)
-
         mask_sus = df['Vertex'].isin(snap['susceptibles'])
         mask_inf = df['Vertex'].isin(snap['infected'])
         mask_rec = df['Vertex'].isin(snap['recovered'])
-
-        coords_sus = zip(*df[mask_sus][['Disc.X', 'Disc.Y']])
-        coords_inf = zip(*df[mask_inf][['Disc.X', 'Disc.Y']])
-        coords_rec = zip(*df[mask_rec][['Disc.X', 'Disc.Y']])
-
-        snapshots.append((snap['time'], coords_sus, coords_inf, coords_rec))
+        coords_sus = df[mask_sus][['Disc.X', 'Disc.Y']]
+        coords_inf = df[mask_inf][['Disc.X', 'Disc.Y']]
+        coords_rec = df[mask_rec][['Disc.X', 'Disc.Y']]
+        
+        snapshots.append((snap['time'], coords_sus.to_numpy(), coords_inf.to_numpy(), coords_rec.to_numpy()))
 
     # ---------- Fase 2: Renderizado ----------
 
+    
+
     for i, s in enumerate(tqdm(snapshots)):
         t, susc_list, inf_list, rec_list = s
+        
     # La función mercator_epidemic_disc probablemente espera conjuntos
         figs.mercator_epidemic_disc(
             df,
-            set(susc_list),
-            set(inf_list),
-            set(rec_list),
+            susc_list,
+            inf_list,
+            rec_list,
             f"{epidemics_fig_output}/sim-{i:04d}.png",
             t,
         )
 
-def get_snapshot(df: pd.DataFrame, events_sorted: pd.DataFrame, t: float, last_state: dict = None ):
-    susceptible = last_state['susceptible'] if last_state else set(df["Vertex"].to_list())
+def get_snapshot(df: pd.DataFrame, events_sorted: pd.DataFrame, t: float, last_state: t.Dict[str, t.Set] = None ):
+    susceptible = last_state['susceptibles'] if last_state else set(df["Vertex"].to_list())
     event_idx = 0
     infected, recovered = set(), set()
     if (last_state):
@@ -124,27 +146,24 @@ def get_snapshot(df: pd.DataFrame, events_sorted: pd.DataFrame, t: float, last_s
         # Guardar estado como listas (serializable)
     return {
         'time': t,
-        'susceptible': susceptible,
+        'susceptibles': susceptible,
         'recovered': recovered,
         'infected': infected
     }
 
 
-def generate_gif(df, epidemic_folder, events, boosted, start_node=None):
-    from . import hyperbolic as hyp
+def generate_gif(df: pd.DataFrame, fig_output:str, events: pd.DataFrame, timespan, step, start_node: str=None, boost: bool=False):
     import os
     df_new = df.copy()
-    fig_output = f'{epidemic_folder}/disc'
-    if boosted:
-        fig_output += 'boosted'
-        df_new = hyp.hyperbolic_boost(df, start_node)
-
+    
     os.makedirs(fig_output, exist_ok=True)
     mercator_disc_epidemic_anim(
         df_new,
         events,
         fig_output,
-        step=0.001,
-        t_start=min(events[events['t'] > 0]['t']),   
-        t_end=min(events[events['t'] > 0]['t'])+3,     
+        step=step,
+        t_start=min(events[events['t'] >= 0]['t']),   
+        t_end=min(events[events['t'] > 0]['t'])+timespan,  
+        start_node=start_node,
+        lorentz_boost=boost
     )

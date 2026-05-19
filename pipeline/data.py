@@ -3,6 +3,37 @@ import pandas as pd
 import networkx as nx
 import typing as t
 
+def build_epidemics_filename(type: str, edges_file: str, weighted: bool, model: str, i_rate: float, r_rate: float, seed: int) -> str:
+    from pathlib import Path
+    return f'{type}-{Path(edges_file).stem}-{'w' if weighted else ''}{model}-I={i_rate:10.5f}-R={r_rate:10.5f}-S={seed:5d}.dat'
+
+def build_events_filename(edges_file: str, weighted: bool, model: str, i_rate: float, r_rate: float, seed: int) -> str:
+    return build_epidemics_filename('events', edges_file, weighted, model, i_rate, r_rate, seed)
+
+def build_stats_filename(edges_file: str, weighted: bool, model: str, i_rate: float, r_rate: float, seed: int) -> str:
+    return build_epidemics_filename('stats', edges_file, weighted, model, i_rate, r_rate, seed)
+
+
+def read_events_data(events_file: str) -> pd.DataFrame:
+    def skip_comments(line_index, line):
+        # Saltar si la línea empieza con '#' o ' #'
+        return line.strip().startswith('#') or line.lstrip().startswith('#')
+
+    with open(events_file, 'r') as f:
+            lines = f.readlines()
+        
+        # Encontrar la primera línea de datos
+    first_data_line = 0
+    for step, line in enumerate(lines):
+        if not line.lstrip().startswith('#'):
+            first_data_line = step
+            break
+    events = pd.read_csv(events_file, 
+                            sep='\\s+', skiprows=first_data_line, names=['t', 'vertex', 'event'])
+    events['vertex'] = events['vertex'].astype(str)
+
+    return events
+
 def read_hyperbolic_data(archivo_coords: str, archivo_edges: str) -> t.Tuple[nx.Graph, pd.DataFrame, dict]:
     """
     Lee el grafo y las coordenadas hiperbólicas del formato S1/H2
