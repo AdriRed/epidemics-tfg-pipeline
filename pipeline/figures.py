@@ -13,7 +13,7 @@ def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [
         for a, b in net.edges():
             xa, ya = positions[a]
             xb, yb = positions[b]
-            ax.add_line(plt.Line2D([xa, xb], [ya, yb], linewidth=0.05, color='#00000015'))
+            ax.add_line(plt.Line2D([xa, xb], [ya, yb], linewidth=0.05, color='#00000045'))
     x_orig, y_orig = zip(*positions.values())
     
     scatter = ax.scatter(x_orig, y_orig, c=kappa_vals, cmap='viridis', zorder=10000,
