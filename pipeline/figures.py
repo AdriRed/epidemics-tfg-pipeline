@@ -3,7 +3,7 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 
-def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R: float =None, c: float =None, title: str = None):
+def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R: float =None, c: float =None, title: str = None, linecolor='#00000045'):
     kappa_vals = []
     positions = {v: (x, y) for _, (v, x, y) in data[['Vertex', 'Disc.X', 'Disc.Y']].iterrows()}
         
@@ -13,7 +13,7 @@ def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [
         for a, b in net.edges():
             xa, ya = positions[a]
             xb, yb = positions[b]
-            ax.add_line(plt.Line2D([xa, xb], [ya, yb], linewidth=0.05, color='#00000045'))
+            ax.add_line(plt.Line2D([xa, xb], [ya, yb], linewidth=0.05, color=linecolor))
     x_orig, y_orig = zip(*positions.values())
     
     scatter = ax.scatter(x_orig, y_orig, c=kappa_vals, cmap='viridis', zorder=10000,

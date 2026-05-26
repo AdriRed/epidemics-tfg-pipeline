@@ -47,7 +47,7 @@ def configure_matplotlib():
         'savefig.pad_inches': 0.05,
 
         'text.usetex': True,
-        'text.latex.preamble': '\\usepackage{amsmath}\n\\usepackage{siunitx}',
+        'text.latex.preamble': '\\usepackage{amsmath, amssymb}\n\\usepackage{siunitx}',
         'pgf.texsystem': 'xelatex'
     }
 

@@ -7,3 +7,4 @@ figures/*
 **__pycache__**
 
 generated-nets/*
+figs/*
