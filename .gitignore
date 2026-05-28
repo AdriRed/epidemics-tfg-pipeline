@@ -8,3 +8,9 @@ figures/*
 
 generated-nets/*
 figs/*
+statistics-nets/*
+
+*.pdf
+*.csv
+*.png
+*.tex
