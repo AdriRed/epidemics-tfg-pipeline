@@ -6,7 +6,7 @@ figures/*
 
 **__pycache__**
 
-generated-nets/*
+generated-nets*/*
 figs/*
 statistics-nets/*
 
