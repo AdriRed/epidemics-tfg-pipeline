@@ -15,10 +15,6 @@ def build_stats_filename(edges_file: str, weighted: bool, model: str, i_rate: fl
 
 
 def read_events_data(events_file: str) -> pd.DataFrame:
-    def skip_comments(line_index, line):
-        # Saltar si la línea empieza con '#' o ' #'
-        return line.strip().startswith('#') or line.lstrip().startswith('#')
-
     with open(events_file, 'r') as f:
             lines = f.readlines()
         
@@ -34,7 +30,22 @@ def read_events_data(events_file: str) -> pd.DataFrame:
 
     return events
 
-def read_hyperbolic_data(archivo_coords: str, archivo_edges: str) -> t.Tuple[nx.Graph, pd.DataFrame, dict]:
+def read_stats_data(stats_file: str) -> pd.DataFrame:
+    with open(stats_file, 'r') as f:
+            lines = f.readlines()
+        
+        # Encontrar la primera línea de datos
+    first_data_line = 0
+    for step, line in enumerate(lines):
+        if not line.lstrip().startswith('#'):
+            first_data_line = step
+            break
+    stats = pd.read_csv(stats_file, 
+                            sep='\\s+', skiprows=first_data_line, names=['t','idens', 'rdens', 'irate', 'rrate'])
+    return stats
+
+
+def read_hyperbolic_data(archivo_coords: str, archivo_edges: str, gen_coord=False) -> t.Tuple[nx.Graph, pd.DataFrame, dict]:
     """
     Lee el grafo y las coordenadas hiperbólicas del formato S1/H2
     """
@@ -46,7 +57,13 @@ def read_hyperbolic_data(archivo_coords: str, archivo_edges: str) -> t.Tuple[nx.
     G = nx.read_edgelist(archivo_edges)
     
     # Leer coordenadas
-    df = pd.read_csv(archivo_coords, sep='\\s+', comment='#', 
+    df = None
+    if (gen_coord):
+        # when reading gen_coord instead of inf_coord
+        df = pd.read_csv(archivo_coords, sep='\\s+', comment='#', 
+                     names=["Vertex", "Inf.Kappa", "Inf.Hyp.Rad.", "Inf.Theta", "RealDeg.", "Exp.Deg."])
+    else:
+        df = pd.read_csv(archivo_coords, sep='\\s+', comment='#', 
                      names=["Vertex", "Inf.Kappa", "Inf.Theta", "Inf.Hyp.Rad."])
     
     # Convertir Vertex a string
@@ -54,18 +71,34 @@ def read_hyperbolic_data(archivo_coords: str, archivo_edges: str) -> t.Tuple[nx.
     # df = df.set_index('Vertex')
     # Leer parámetros del archivo
     params = {}
-    with open(archivo_coords, 'r') as f:
-        for line in f:
-            if line.startswith('#') and ':' in line:
-                parts = line.strip('# ').split(':')
-                if len(parts) == 2:
-                    key = parts[0].strip()
-                    if (key.startswith('-')):
-                        key = key[1:].strip()
-                    try:
-                        params[key] = float(parts[1].strip())
-                    except ValueError:
-                        params[key] = parts[1].strip()
+    if (gen_coord):
+        # when reading gen_coord instead of inf_coord
+        with open(archivo_edges, 'r') as f:
+                    for line in f:
+                        if line.startswith('#') and ':' in line:
+                            parts = line.strip('# ').split(':')
+                            if len(parts) == 2:
+                                key = parts[0].strip()
+                                if (key.startswith('-')):
+                                    key = key[1:].strip()
+                                try:
+                                    params[key] = float(parts[1].strip())
+                                except ValueError:
+                                    params[key] = parts[1].strip()
+        params['kappa_min'] = np.min(df['Inf.Kappa'])
+    else:
+        with open(archivo_coords, 'r') as f:
+            for line in f:
+                if line.startswith('#') and ':' in line:
+                    parts = line.strip('# ').split(':')
+                    if len(parts) == 2:
+                        key = parts[0].strip()
+                        if (key.startswith('-')):
+                            key = key[1:].strip()
+                        try:
+                            params[key] = float(parts[1].strip())
+                        except ValueError:
+                            params[key] = parts[1].strip()
     
     df['Disc.Radius'] = hyp.hyperbolic_to_mercator(hyp.kappa_to_hyperbolic(df['Inf.Kappa'], params['kappa_min']), params['nb. vertices'], params['mu'], params['kappa_min'])
     
