@@ -6,4 +6,14 @@
             132
         ]
     },
+    "search.exclude": {
+        "generated-nets/**/*": true,
+        "generated-nets-2/**/*": true,
+        "pipeline-output/**/*": true,
+    },
+    "C_Cpp.files.exclude": {
+        "generated-nets/**/*": true,
+        "generated-nets-2/**/*": true,
+        "pipeline-output/**/*": true,
+    }
 }
