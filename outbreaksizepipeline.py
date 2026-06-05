@@ -13,13 +13,14 @@ import networkx as nx
 import pandas as pd
 from tqdm import tqdm
 import pipeline.data as data
-
+import pipeline.hyperbolic as hyp
+import shutil
 # ============================================================
 # Fixed simulation parameters (consistent with original pipeline)
 # ============================================================
 N = 1000
 K = 20               # average degree
-GAMMA = 2.1          # for config and S¹/H²
+GAMMA = 2.1          # for conf and S¹/H²
 BETA = 2.1           # for S¹/H²
 R_RATE = 1.0
 LIMIT_TIME = 1e10
@@ -28,10 +29,11 @@ BASE_SEED = 42075    # base for epidemic seeds
 NUM_EPIDEMIC_SEEDS = 10000
 
 # Infection rates from 0.01 to 0.09 step 0.005
-I_RATES = np.arange(0.1, 0.95, 0.05)
+I_RATES = np.flip(np.arange(0.1, 0.95, 0.05))
 
 # Networks to process
-MODELS = ['er', 'ba', 'config', 's1h2']
+# MODELS = ['er', 'ba', 'conf', 's1h2']
+MODELS = ['s1h2']
 NETWORK_SEEDS = [12345, 12346, 12347, 12348, 12349]
 
 # ============================================================
@@ -39,12 +41,12 @@ NETWORK_SEEDS = [12345, 12346, 12347, 12348, 12349]
 # ============================================================
 def get_network_file(model, net_seed, extension):
     """Return the full path to the edge file for a given model and network seed."""
-    base = f'generated-nets/{model}-s={net_seed}'
+    base = f'generated-nets-2/{model}-s={net_seed}'
     if model == 'er':
         return f'{base}/er-n={N}-k={K}-s={net_seed}.{extension}'
     elif model == 'ba':
         return f'{base}/ba-n={N}-k={K}-s={net_seed}.{extension}'
-    elif model == 'config':
+    elif model == 'conf':
         return f'{base}/conf-n={N}-k={K}-g={GAMMA}-s={net_seed}.{extension}'
     elif model == 's1h2':
         return f'{base}/s1h2-n={N}-k={K}-g={GAMMA}-b={BETA}-s={net_seed}.{extension}'
@@ -112,7 +114,7 @@ def extract_parameters_from_filename(filename):
     # Pattern: -I= followed by optional spaces, a float, then -R= optional spaces float,
     # then -S= optional spaces integer, then -SN= optional spaces integer (maybe with leading zeros)
     match = re.search(
-        r'-I=\s*([\d\.]+)\s+-R=\s*[\d\.]+\s+-S=\s*(\d+)\s+-SN=\s*(\d+)',
+        r'-I=\s*([\d\.]+)\s*-R=\s*[\d\.]+\s*-S=\s*(\d+)\s*-SN=\s*(\d+)',
         base
     )
     if match:
@@ -129,38 +131,49 @@ def count_successes(output_dir, hub_node, expected_i_rates, num_seeds):
     Returns a dict {i_rate: success_count}.
     """
     # Counters
-    success = {ir: 0 for ir in expected_i_rates}
-    total = {ir: 0 for ir in expected_i_rates}
-
+    success = {f'{ir:0.5f}': 0 for ir in expected_i_rates}
+    total = {f'{ir:0.5f}': 0 for ir in expected_i_rates}
     # Find all .dat files (stats files)
-    stats_files = glob.glob(os.path.join(output_dir, "*.dat"))
-    for fpath in stats_files:
+    # stats_files = glob.glob(output_dir)
+    stats_files = glob.glob(os.path.join(output_dir, '*.dat'))
+    # print(output_dir)
+    # print(stats_files)
+    for fpath in tqdm(stats_files, desc='Processing files'):
+        # print(fpath)
         params = extract_parameters_from_filename(fpath)
         if params is None:
+            print(f'Params is None in filename {fpath}')
             continue
         i_rate, seed, start_node = params
+        # print(params)
         # Only consider simulations that started from the hub node
         if start_node != hub_node:
+            print(f'Start node {start_node} != hub_node {hub_node}')
             continue
         # Update totals
-        total[i_rate] += 1
+        total[f'{i_rate:0.5f}'] += 1
         final_rec = parse_stats_file(fpath)
-        if final_rec is not None and final_rec > 0.9:
-            success[i_rate] += 1
+        # print(final_rec)
+        if (final_rec is None):
+            print('final_rec is None')
+
+        if final_rec is not None and final_rec >= 0.9:
+            success[f'{i_rate:0.5f}'] += 1
 
     # Sanity check: all i_rates should have exactly num_seeds files
     for ir, cnt in total.items():
         if cnt != num_seeds:
             print(f"  Warning: for i_rate={ir:.4f} only {cnt}/{num_seeds} stats files found")
-    return success
+    return success, total
 
-def save_results(output_dir, successes, num_seeds):
+def save_results(output_dir, successes, totals):
     """Write the success counts to a file."""
     out_file = os.path.join(output_dir, 'success_counts.dat')
+    print(successes)
     with open(out_file, 'w') as f:
         f.write("# infection_rate  successes  total_simulations\n")
         for i_rate in I_RATES:
-            f.write(f"{i_rate:.6f} {successes[i_rate]} {num_seeds}\n")
+            f.write(f"{i_rate:.6f} {successes[f'{i_rate:0.5f}']} {totals[f'{i_rate:0.5f}']}\n")
     print(f"  Results saved to {out_file}")
 
 # ============================================================
@@ -174,28 +187,53 @@ def main():
             if not os.path.exists(edge_file):
                 print(f"  Edge file not found: {edge_file}. Skipping.")
                 continue
-
+            
             # Find the hub (highest degree) node
             G, df, params = data.read_hyperbolic_data(get_coords_file(model, net_seed), edge_file, model == 's1h2')
+
+            edges = pd.DataFrame(G.edges, columns=['a', 'b'])
+            edges = pd.merge(edges, df[['Vertex', 'Disc.Radius', 'Inf.Theta']], left_on='a', right_on='Vertex', suffixes=('_a', '_b'))
+            edges = pd.merge(edges, df[['Vertex', 'Disc.Radius', 'Inf.Theta']], left_on='b', right_on='Vertex', suffixes=('_a', '_b'))
+            edges['Theta_Dif'] = np.pi - np.abs(np.pi - np.abs(edges['Inf.Theta_a']-edges['Inf.Theta_b']))
+
+            edges['Distance'] = np.where(edges['Theta_Dif'] == 0, 
+                                        np.abs(edges['Disc.Radius_a']- edges['Disc.Radius_b']), 
+                                        hyp.hyperbolic_distance_og(edges['Disc.Radius_a'], edges['Disc.Radius_b'], edges['Theta_Dif']))
+
+            R = 2 * np.log(params['nb. vertices']/(params['mu']*np.pi*params['kappa_min']**2))
+
+            n=0
+            c = -(n+1)/10
+            edges['Epidemic_Func'] = hyp.link_probability_og(edges['Distance'], R, c)
+
+            avg_epidemic_func = np.average(edges['Epidemic_Func'])
+
+            edges['Weight_Multiplier'] = edges['Epidemic_Func']/avg_epidemic_func
+            weight_file = f"{edge_file}_weight_-1x10^-1"
+
+            edges.to_csv(weight_file, sep='\t', header=False, index=False, columns=['a', 'b', 'Weight_Multiplier'])
+
             hub_node = data.get_most_popular_node(G)
             print(f"  Hub node: {hub_node} (degree {G.degree()[hub_node]})")
 
             # Create output directory for this network
             base_folder = os.path.dirname(edge_file)
             output_dir = os.path.join(base_folder, 'outbreak-size-epidemics')
+            if os.path.exists(output_dir):
+                shutil.rmtree(output_dir)
             os.makedirs(output_dir, exist_ok=True)
 
             # Generate batch file and run epidemics
             batch_file = generate_batch_file(output_dir, hub_node, I_RATES,
                                              NUM_EPIDEMIC_SEEDS, BASE_SEED)
             print("  Running epidemics (this may take a while)...")
-            weight_file = f"{edge_file}_weight_-1x10^-1"
             run_epidemics(batch_file, weight_file, output_dir)
             print("  Epidemics finished.")
 
             # Count successful outbreaks (final recovered density > 0.9)
-            successes = count_successes(output_dir, hub_node, I_RATES, NUM_EPIDEMIC_SEEDS)
-            save_results(output_dir, successes, NUM_EPIDEMIC_SEEDS)
+            successes, totals = count_successes(output_dir, int(hub_node), I_RATES, NUM_EPIDEMIC_SEEDS)
+            save_results(output_dir, successes, totals)
 
 if __name__ == "__main__":
     main()
+    # print(count_successes("./generated-nets-2/ba-s=12349/outbreak-size-epidemics/stats-ba-n=1000-k=20-s=12349-wSIR-I=   0.70000-R=   1.00000-S=46517-SN=00011*", 11, [0.7], 1))

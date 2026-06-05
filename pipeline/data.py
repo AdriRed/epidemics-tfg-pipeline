@@ -5,7 +5,7 @@ import typing as t
 
 def build_epidemics_filename(type: str, edges_file: str, weighted: bool, model: str, i_rate: float, r_rate: float, seed: int, start_node:int) -> str:
     from pathlib import Path
-    return f'{type}-{Path(edges_file).stem}-{'w' if weighted else ''}{model}-I={i_rate:10.5f}-R={r_rate:10.5f}-S={seed:5d}-SN={start_node:05d}.dat'
+    return f'{type}-{Path(edges_file).stem}-{'w' if weighted else ''}{model}-I={i_rate:10.5f}-R={r_rate:10.5f}-S={seed:10d}-SN={start_node:05d}.dat'
 
 def build_events_filename(edges_file: str, weighted: bool, model: str, i_rate: float, r_rate: float, seed: int, start_node: int) -> str:
     return build_epidemics_filename('events', edges_file, weighted, model, i_rate, r_rate, seed, start_node)

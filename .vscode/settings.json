@@ -15,5 +15,8 @@
         "generated-nets/**/*": true,
         "generated-nets-2/**/*": true,
         "pipeline-output/**/*": true,
+    },
+    "files.exclude":{
+        "**/outbreak-size-epidemics": true
     }
 }
