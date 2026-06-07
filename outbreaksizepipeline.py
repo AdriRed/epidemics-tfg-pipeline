@@ -29,11 +29,11 @@ BASE_SEED = 42075    # base for epidemic seeds
 NUM_EPIDEMIC_SEEDS = 10000
 
 # Infection rates from 0.01 to 0.09 step 0.005
-I_RATES = np.flip(np.arange(0.1, 0.95, 0.05))
+I_RATES = np.flip(np.arange(0.95, 1.25, 0.02))
 
 # Networks to process
-# MODELS = ['er', 'ba', 'conf', 's1h2']
-MODELS = ['s1h2']
+MODELS = ['er', 'ba', 'conf', 's1h2']
+# MODELS = ['conf', ]
 NETWORK_SEEDS = [12345, 12346, 12347, 12348, 12349]
 
 # ============================================================
@@ -41,7 +41,7 @@ NETWORK_SEEDS = [12345, 12346, 12347, 12348, 12349]
 # ============================================================
 def get_network_file(model, net_seed, extension):
     """Return the full path to the edge file for a given model and network seed."""
-    base = f'generated-nets-2/{model}-s={net_seed}'
+    base = f'generated-nets/{model}-s={net_seed}'
     if model == 'er':
         return f'{base}/er-n={N}-k={K}-s={net_seed}.{extension}'
     elif model == 'ba':
@@ -87,7 +87,7 @@ def run_epidemics(batch_file, weight_file, output_dir):
         "-ss", "10000",     # sampling steps (kept as in original)
         "-w",weight_file
     ]
-    subprocess.run(cmd, check=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    subprocess.run(cmd, check=True, stderr=subprocess.DEVNULL)
 
 def parse_stats_file(filepath):
     """
@@ -131,8 +131,9 @@ def count_successes(output_dir, hub_node, expected_i_rates, num_seeds):
     Returns a dict {i_rate: success_count}.
     """
     # Counters
-    success = {f'{ir:0.5f}': 0 for ir in expected_i_rates}
-    total = {f'{ir:0.5f}': 0 for ir in expected_i_rates}
+    # success = {f'{ir:0.5f}': 0 for ir in expected_i_rates}
+    # total = {f'{ir:0.5f}': 0 for ir in expected_i_rates}
+    success, total = {}, {}
     # Find all .dat files (stats files)
     # stats_files = glob.glob(output_dir)
     stats_files = glob.glob(os.path.join(output_dir, '*.dat'))
@@ -150,15 +151,20 @@ def count_successes(output_dir, hub_node, expected_i_rates, num_seeds):
         if start_node != hub_node:
             print(f'Start node {start_node} != hub_node {hub_node}')
             continue
+        key = f'{i_rate:0.5f}'
+        if (key not in success):
+            success[key] = 0
+        if (key not in total):
+            total[key] = 0
         # Update totals
-        total[f'{i_rate:0.5f}'] += 1
+        total[key] += 1
         final_rec = parse_stats_file(fpath)
         # print(final_rec)
         if (final_rec is None):
             print('final_rec is None')
 
         if final_rec is not None and final_rec >= 0.9:
-            success[f'{i_rate:0.5f}'] += 1
+            success[key] += 1
 
     # Sanity check: all i_rates should have exactly num_seeds files
     for ir, cnt in total.items():
@@ -180,8 +186,8 @@ def save_results(output_dir, successes, totals):
 # Main loop
 # ============================================================
 def main():
-    for model in MODELS:
-        for net_seed in NETWORK_SEEDS:
+    for net_seed in NETWORK_SEEDS:
+        for model in MODELS:
             print(f"\n=== Processing {model} with network seed {net_seed} ===")
             edge_file = get_edges_file(model, net_seed)
             if not os.path.exists(edge_file):
@@ -218,9 +224,9 @@ def main():
 
             # Create output directory for this network
             base_folder = os.path.dirname(edge_file)
-            output_dir = os.path.join(base_folder, 'outbreak-size-epidemics')
-            if os.path.exists(output_dir):
-                shutil.rmtree(output_dir)
+            output_dir = os.path.join(base_folder, 'outbreak-size-epidemics-2')
+            # if os.path.exists(output_dir):
+            #     shutil.rmtree(output_dir)
             os.makedirs(output_dir, exist_ok=True)
 
             # Generate batch file and run epidemics

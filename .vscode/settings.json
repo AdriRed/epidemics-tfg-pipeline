@@ -17,6 +17,6 @@
         "pipeline-output/**/*": true,
     },
     "files.exclude":{
-        "**/outbreak-size-epidemics": true
+        "**/outbreak-size-epidemics*": true
     }
 }
