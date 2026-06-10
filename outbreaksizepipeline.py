@@ -29,12 +29,13 @@ BASE_SEED = 42075    # base for epidemic seeds
 NUM_EPIDEMIC_SEEDS = 10000
 
 # Infection rates from 0.01 to 0.09 step 0.005
-I_RATES = np.flip(np.arange(0.95, 1.25, 0.02))
+# I_RATES = np.flip(np.arange(0.95, 1.25, 0.02))
+I_RATES = np.flip(np.arange(0.002, 0.1, 0.002))
 
 # Networks to process
 MODELS = ['er', 'ba', 'conf', 's1h2']
 # MODELS = ['conf', ]
-NETWORK_SEEDS = [12345, 12346, 12347, 12348, 12349]
+NETWORK_SEEDS = [12348, 12349]
 
 # ============================================================
 # Helper functions
@@ -89,17 +90,39 @@ def run_epidemics(batch_file, weight_file, output_dir):
     ]
     subprocess.run(cmd, check=True, stderr=subprocess.DEVNULL)
 
-def parse_stats_file(filepath):
+def parse_stats_file_fast(filepath):
     """
-    Read a stats file produced by the epidemics tool.
-    Returns the final recovered density (last row of the 'recovered_density' column).
+    Lee solo la última línea del archivo de stats y extrae la densidad de recuperados.
+    Retorna float (recovered_density) o None si no se puede obtener.
     """
-    df = pd.read_csv(filepath, sep=r'\s+', comment='#', header=None,
-                     names=['time', 'infected_density', 'recovered_density',
-                            'actual_infection_rate', 'actual_recovery_rate'])
-    if df.empty:
+    try:
+        with open(filepath, 'rb') as f:
+            # Saltar al final del archivo
+            f.seek(0, 2)
+            size = f.tell()
+            if size == 0:
+                return None
+            # Leer hacia atrás desde el final hasta encontrar un salto de línea
+            buffer = bytearray()
+            pos = size - 1
+            while pos >= 0 and buffer.count(b'\n') < 2:
+                f.seek(pos)
+                buffer.append(f.read(1)[0])
+                pos -= 1
+            # La última línea completa
+            last_line = buffer.split(b'\n')[-2].decode('utf-8').strip()
+            last_line = last_line[::-1]
+            if not last_line:
+                return None
+            # Formato esperado (separado por espacios):
+            # time infected_density recovered_density actual_infection_rate actual_recovery_rate
+            # time, infected_density, recovered_density, actual_infection_rate, actual_recovery_rate
+            parts = last_line.split()
+            if len(parts) >= 3:
+                return float(parts[2])   # tercera columna = recovered_density
+    except Exception:
         return None
-    return df['recovered_density'].iloc[-1]
+    return None
 
 
 def extract_parameters_from_filename(filename):
@@ -126,60 +149,59 @@ def extract_parameters_from_filename(filename):
 
 def count_successes(output_dir, hub_node, expected_i_rates, num_seeds):
     """
-    Scan all stats files in output_dir, compute final recovery density,
-    and count how many seeds per infection rate have final recovery > 0.9.
-    Returns a dict {i_rate: success_count}.
+    Escanea todos los archivos .dat en output_dir, calcula la densidad final de recuperados
+    y cuenta cuántas semillas por tasa de infección superan 0.9.
+    Retorna diccionarios {i_rate: <R>} y {i_rate: <R^2>}.
     """
-    # Counters
-    # success = {f'{ir:0.5f}': 0 for ir in expected_i_rates}
-    # total = {f'{ir:0.5f}': 0 for ir in expected_i_rates}
-    success, total = {}, {}
-    # Find all .dat files (stats files)
-    # stats_files = glob.glob(output_dir)
+    success = {}   # suma de R
+    success2 = {}  # suma de R^2
+    total = {}     # contador de simulaciones válidas
+
     stats_files = glob.glob(os.path.join(output_dir, '*.dat'))
-    # print(output_dir)
-    # print(stats_files)
-    for fpath in tqdm(stats_files, desc='Processing files'):
-        # print(fpath)
+    for fpath in tqdm(stats_files, desc=f'Procesando {len(stats_files)} archivos'):
         params = extract_parameters_from_filename(fpath)
         if params is None:
-            print(f'Params is None in filename {fpath}')
             continue
         i_rate, seed, start_node = params
-        # print(params)
-        # Only consider simulations that started from the hub node
-        if start_node != hub_node:
-            print(f'Start node {start_node} != hub_node {hub_node}')
-            continue
+
         key = f'{i_rate:0.5f}'
-        if (key not in success):
-            success[key] = 0
-        if (key not in total):
+        if key not in success:
+            success[key] = 0.0
+            success2[key] = 0.0
             total[key] = 0
-        # Update totals
+
+        final_rec = parse_stats_file_fast(fpath)
+        if final_rec is None:
+            continue   # omitir este archivo
+
+        success[key] += final_rec
+        success2[key] += final_rec * final_rec
         total[key] += 1
-        final_rec = parse_stats_file(fpath)
-        # print(final_rec)
-        if (final_rec is None):
-            print('final_rec is None')
 
-        if final_rec is not None and final_rec >= 0.9:
-            success[key] += 1
-
-    # Sanity check: all i_rates should have exactly num_seeds files
+    # Verificar que todos los rates tengan el número esperado de archivos
     for ir, cnt in total.items():
         if cnt != num_seeds:
-            print(f"  Warning: for i_rate={ir:.4f} only {cnt}/{num_seeds} stats files found")
-    return success, total
+            print(f"  Advertencia: para i_rate={ir} solo {cnt}/{num_seeds} archivos válidos")
 
-def save_results(output_dir, successes, totals):
+    # Calcular promedios
+    for key in total:
+        if total[key] > 0:
+            success[key] /= total[key]
+            success2[key] /= total[key]
+        else:
+            success[key] = float('nan')
+            success2[key] = float('nan')
+
+    return success, success2
+
+def save_results(output_dir, successes, successes2):
     """Write the success counts to a file."""
     out_file = os.path.join(output_dir, 'success_counts.dat')
-    print(successes)
+    # print(successes)
     with open(out_file, 'w') as f:
-        f.write("# infection_rate  successes  total_simulations\n")
-        for i_rate in I_RATES:
-            f.write(f"{i_rate:.6f} {successes[f'{i_rate:0.5f}']} {totals[f'{i_rate:0.5f}']}\n")
+        f.write("# infection_rate <R> <R^2>\n")
+        for i_rate in successes:
+            f.write(f"{i_rate} {successes[i_rate]} {successes2[i_rate]}\n")
     print(f"  Results saved to {out_file}")
 
 # ============================================================
@@ -225,8 +247,11 @@ def main():
             # Create output directory for this network
             base_folder = os.path.dirname(edge_file)
             output_dir = os.path.join(base_folder, 'outbreak-size-epidemics-2')
-            # if os.path.exists(output_dir):
-            #     shutil.rmtree(output_dir)
+            if os.path.exists(output_dir):
+                shutil.rmtree(output_dir)
+            output_dir = os.path.join(base_folder, 'outbreak-size-epidemics')
+            if os.path.exists(output_dir):
+                shutil.rmtree(output_dir)
             os.makedirs(output_dir, exist_ok=True)
 
             # Generate batch file and run epidemics
@@ -237,8 +262,8 @@ def main():
             print("  Epidemics finished.")
 
             # Count successful outbreaks (final recovered density > 0.9)
-            successes, totals = count_successes(output_dir, int(hub_node), I_RATES, NUM_EPIDEMIC_SEEDS)
-            save_results(output_dir, successes, totals)
+            successes, success2 = count_successes(output_dir, int(hub_node), I_RATES, NUM_EPIDEMIC_SEEDS)
+            save_results(output_dir, successes, success2)
 
 if __name__ == "__main__":
     main()
