@@ -4,39 +4,172 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R: float =None, c: float =None, title: str = None, linecolor='#00000045'):
-    kappa_vals = []
     positions = {v: (x, y) for _, (v, x, y) in data[['Vertex', 'Disc.X', 'Disc.Y']].iterrows()}
-        
     kappa_vals = np.log10(data['Inf.Kappa'])
+    x_orig, y_orig = zip(*positions.values())
     
-    if (net):
+    # ARISTAS: zorder muy bajo
+    if net:
         for a, b in net.edges():
             xa, ya = positions[a]
             xb, yb = positions[b]
-            ax.add_line(plt.Line2D([xa, xb], [ya, yb], linewidth=0.05, color=linecolor))
-    x_orig, y_orig = zip(*positions.values())
+            ax.add_line(plt.Line2D([xa, xb], [ya, yb], 
+                                  linewidth=0.05, color=linecolor, 
+                                  zorder=0))  # <- Debajo de todo
     
-    scatter = ax.scatter(x_orig, y_orig, c=kappa_vals, cmap='viridis', zorder=10000,
-                        s=15, alpha=0.5, edgecolors='black', linewidth=0.3)
-    # circle = plt.Circle((0, 0), 1, fill=False, color='red', linestyle='--')
-    # ax.add_patch(circle)
+    # NODOS: zorder muy alto
+    scatter = ax.scatter(x_orig, y_orig, c=kappa_vals, cmap='viridis', 
+                        s=15, edgecolors='black', linewidth=0.3,
+                        zorder=10)  # <- Encima de las aristas
     
+    # NODOS MARCADOS: zorder aún más alto
     for mark_node in mark_nodes:
         mark_data = data[data['Vertex'] == mark_node].iloc[0]
-        ax.plot(mark_data['Disc.X'], mark_data['Disc.Y'], 'r*', markersize=15, markeredgecolor='black', zorder=100000)
+        ax.plot(mark_data['Disc.X'], mark_data['Disc.Y'], 'r*', 
+               markersize=15, markeredgecolor='black', 
+               zorder=20)  # <- Encima de todo
     
-
+    # Isolíneas
     if isolines_nodes:
         for node in isolines_nodes:
             center = data[data['Vertex'] == node].iloc[0]
             r, theta = center['Disc.Radius'], center['Inf.Theta']
-            dibujar_isolineas(ax, r, theta, R=R, c=c, resolucion=3000)
-
-    if (title):
+            dibujar_isolineas(ax, r, theta, R=R, c=c, resolucion=3000, zorder=5)
+    
+    ax.set_axisbelow(True)
+    ax.grid(True, alpha=0.3, zorder=0)  # Grid debajo
+    
+    if title:
         ax.set_title(title)
+    
+    return scatter
 
-    # ax.set_aspect('equal')
+import numpy as np
+from matplotlib.patches import Arc
+from matplotlib.path import Path
+import matplotlib.patches as patches
+
+def get_hyperbolic_edge(x1, y1, x2, y2, num_points=100):
+    """
+    Calcula la geodésica hiperbólica entre dos puntos en el disco de Poincaré.
+    Retorna las coordenadas x, y de la curva.
+    """
+    # Convertir a números complejos
+    z1 = x1 + 1j*y1
+    z2 = x2 + 1j*y2
+    
+    # Para puntos colineales con el centro o muy cercanos, usar línea recta
+    if abs(x1*y2 - x2*y1) < 1e-10:  # Alineados con el centro
+        return np.linspace(x1, x2, num_points), np.linspace(y1, y2, num_points)
+    
+    # Encontrar el centro del círculo ortogonal
+    # La geodésica es un arco de círculo perpendicular al círculo unitario
+    
+    # Calcular el círculo que pasa por z1, z2 y es ortogonal al círculo unitario
+    # El centro del círculo ortogonal está en la intersección de las mediatrices
+    
+    # Método: El centro del círculo de la geodésica satisface |c|^2 - R^2 = 1
+    # y |c - z1| = |c - z2| = R
+    
+    # Resolver para el centro c = (cx, cy)
+    # De la condición de equidistancia:
+    # (cx - x1)^2 + (cy - y1)^2 = (cx - x2)^2 + (cy - y2)^2
+    # Esto da: 2cx(x2-x1) + 2cy(y2-y1) = x2^2 - x1^2 + y2^2 - y1^2
+    
+    A = 2*(x2 - x1)
+    B = 2*(y2 - y1)
+    C = x2**2 - x1**2 + y2**2 - y1**2
+    
+    # Ortogonalidad: |c|^2 - R^2 = 1, y R^2 = |c - z1|^2
+    # Esto implica: |c|^2 - |c - z1|^2 = 1
+    # Expandido: 2cx*x1 + 2cy*y1 = x1^2 + y1^2 - 1
+    
+    D = 2*x1
+    E = 2*y1
+    F = x1**2 + y1**2 - 1
+    
+    # Resolver sistema lineal para cx, cy
+    det = A*E - B*D
+    if abs(det) < 1e-10:
+        # Puntos diametralmente opuestos o degenerados
+        return np.linspace(x1, x2, num_points), np.linspace(y1, y2, num_points)
+    
+    cx = (C*E - B*F) / det
+    cy = (A*F - C*D) / det
+    c = cx + 1j*cy
+    
+    # Radio del círculo
+    R = abs(c - z1)
+    
+    # Ángulos de los puntos respecto al centro
+    angle1 = np.arctan2(y1 - cy, x1 - cx)
+    angle2 = np.arctan2(y2 - cy, x2 - cx)
+    
+    # Asegurar el arco más corto
+    d_angle = angle2 - angle1
+    if d_angle > np.pi:
+        d_angle -= 2*np.pi
+    elif d_angle < -np.pi:
+        d_angle += 2*np.pi
+    
+    angles = np.linspace(angle1, angle1 + d_angle, num_points)
+    x_points = cx + R * np.cos(angles)
+    y_points = cy + R * np.sin(angles)
+    
+    return x_points, y_points
+
+def mercator_disc_hyperbolic_net_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [], 
+                     net: nx.Graph = None, isolines_nodes: list[str] = None, 
+                     R: float = None, c: float = None, title: str = None, 
+                     linecolor='#00000045', hyperbolic_edges=True):
+    
+    kappa_vals = []
+    positions = {v: (x, y) for _, (v, x, y) in data[['Vertex', 'Disc.X', 'Disc.Y']].iterrows()}
+    
+    kappa_vals = np.log10(data['Inf.Kappa'])
+    
+    if net:
+        for a, b in net.edges():
+            xa, ya = positions[a]
+            xb, yb = positions[b]
+            
+            if hyperbolic_edges:
+                # Dibujar geodésica hiperbólica
+                x_curve, y_curve = get_hyperbolic_edge(xa, ya, xb, yb)
+                ax.plot(x_curve, y_curve, linewidth=0.5, color=linecolor, 
+                       solid_capstyle='round', zorder=1)
+            else:
+                # Línea recta euclidiana (original)
+                ax.add_line(plt.Line2D([xa, xb], [ya, yb], 
+                                      linewidth=0.5, color=linecolor))
+    
+    x_orig, y_orig = zip(*positions.values())
+    
+    scatter = ax.scatter(x_orig, y_orig, c=kappa_vals, cmap='viridis', zorder=10000,
+                        s=15, alpha=0.5, edgecolors='black', linewidth=0.3)
+    
+    for mark_node in mark_nodes:
+        mark_data = data[data['Vertex'] == mark_node].iloc[0]
+        ax.plot(mark_data['Disc.X'], mark_data['Disc.Y'], 'r*', 
+                markersize=15, markeredgecolor='black', zorder=100000)
+    
+    if isolines_nodes:
+        for node in isolines_nodes:
+            center = data[data['Vertex'] == node].iloc[0]
+            r, theta = center['Disc.Radius'], center['Inf.Theta']
+            # Asumiendo que dibujar_isolineas ya usa geodésicas hiperbólicas
+            dibujar_isolineas(ax, r, theta, R=R, c=c, resolucion=3000)
+    
+    if title:
+        ax.set_title(title)
+    
     ax.grid(True, alpha=0.3)
+    # Importante: mantener la relación de aspecto para geometría hiperbólica
+    # ax.set_aspect('equal')
+    # # Asegurar que el disco se ve completo
+    # ax.set_xlim(-1.05, 1.05)
+    # ax.set_ylim(-1.05, 1.05)
+    
     return scatter
 
 def mercator_disc(data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R=None, c=None, title: str = None):
