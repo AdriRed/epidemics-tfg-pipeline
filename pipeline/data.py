@@ -114,5 +114,6 @@ def read_hyperbolic_data(archivo_coords: str, archivo_edges: str, gen_coord=Fals
     
     return G, df, params
 
-def get_most_popular_node(G: nx.Graph) -> str:
-    return max(G.degree(), key=lambda x: x[1])[0]
+def get_most_popular_node(G: nx.Graph, n=0) -> str:
+    s = sorted(G.degree(), key=lambda x: x[1], reverse=True)
+    return s[n][0]

@@ -33,14 +33,22 @@ def hyperbolic_distance_og(r1, r2, delta_theta, zeta=1.0):
     cosh_dist = np.clip(cosh_dist, 1.0, None)
     return np.arccosh(cosh_dist) / zeta
 
-def kappa_to_hyperbolic(kappa, kappa_min):
-    """Convierte kappa a radio hiperbólico nativo."""
-    return (1.0 / (kappa - kappa_min)) ** 0.5  # Aproximación típica, ajusta según tu modelo
+def kappa_to_hyperbolic(kappa, kappa_min): # ln k/k_0
+    """
+    Convierte κ a coordenada radial hiperbólica
+    r = ln(κ/κ_min)
+    """
+    import numpy as np
+    return np.log(kappa / kappa_min)
 
-def hyperbolic_to_mercator(r_hyp, N, mu, kappa_min):
-    """Transforma radio nativo a radio del disco de Poincaré (proyección conforme)."""
-    # Ajustar según tu mapeo real. Aquí va una fórmula común:
-    return np.tanh(r_hyp / 2.0)  # Mapeo de Beltrami-Poincaré; si no, usa la que tenías
+def hyperbolic_to_mercator(r_hiperbolico, edge_count, mu, kappa_min):
+    """
+    Convierte radio hiperbólico a coordenada en disco de Poincaré
+    r_poincare = R*-2*r_hyp
+    """
+    import numpy as np
+    R = 2 * np.log(edge_count/(mu*np.pi*kappa_min**2))
+    return R - 2* r_hiperbolico
 
 def centrar_en_origen(r, theta, r_centro, theta_centro, zeta=1.0):
     """Isometría hiperbólica que lleva (r_centro, theta_centro) al origen."""
@@ -69,38 +77,72 @@ def centrar_en_origen(r, theta, r_centro, theta_centro, zeta=1.0):
 # ----------------------------------------------------------------------
 # Funciones de entrada/salida de datos (reproducidas)
 # ----------------------------------------------------------------------
-def read_hyperbolic_data(archivo_coords, archivo_edges):
-    """Lee el grafo y coordenadas. Devuelve G, df, params."""
+def read_hyperbolic_data(archivo_coords: str, archivo_edges: str):
+    """
+    Lee el grafo y las coordenadas hiperbólicas del formato S1/H2
+    """
+    import networkx as nx
+    import pandas as pd
+    import numpy as np
+    # Leer grafo
     G = nx.read_edgelist(archivo_edges)
-    df = pd.read_csv(archivo_coords, sep='\\s+', comment='#',
+    gen_coord = 'gen_coord' in archivo_coords
+    # Leer coordenadas
+    df = None
+    if (gen_coord):
+        # when reading gen_coord instead of inf_coord
+        df = pd.read_csv(archivo_coords, sep='\\s+', comment='#', 
+                     names=["Vertex", "Inf.Kappa", "Inf.Hyp.Rad.", "Inf.Theta", "RealDeg.", "Exp.Deg."])
+    else:
+        df = pd.read_csv(archivo_coords, sep='\\s+', comment='#', 
                      names=["Vertex", "Inf.Kappa", "Inf.Theta", "Inf.Hyp.Rad."])
+    
+    # Convertir Vertex a string
     df['Vertex'] = df['Vertex'].astype(str)
-
-    # Parámetros desde el archivo de coordenadas
+    # df = df.set_index('Vertex')
+    # Leer parámetros del archivo
     params = {}
-    with open(archivo_coords, 'r') as f:
-        for line in f:
-            if line.startswith('#') and ':' in line:
-                parts = line.strip('# ').split(':')
-                if len(parts) == 2:
-                    key = parts[0].strip().lstrip('-')
-                    try:
-                        params[key] = float(parts[1].strip())
-                    except ValueError:
-                        params[key] = parts[1].strip()
-
-    kappa_min = np.min(df['Inf.Kappa'])
-    params['kappa_min'] = kappa_min
-
-    # Calcular radio en el disco
-    df['Disc.Radius'] = hyperbolic_to_mercator(
-        kappa_to_hyperbolic(df['Inf.Kappa'], kappa_min),
-        params['nb. vertices'], params['mu'], kappa_min
-    )
+    if (gen_coord):
+        # when reading gen_coord instead of inf_coord
+        with open(archivo_edges, 'r') as f:
+                    for line in f:
+                        if line.startswith('#') and ':' in line:
+                            parts = line.strip('# ').split(':')
+                            if len(parts) == 2:
+                                key = parts[0].strip()
+                                if (key.startswith('-')):
+                                    key = key[1:].strip()
+                                try:
+                                    params[key] = float(parts[1].strip())
+                                except ValueError:
+                                    params[key] = parts[1].strip()
+        params['kappa_min'] = np.min(df['Inf.Kappa'])
+    else:
+        with open(archivo_coords, 'r') as f:
+            for line in f:
+                if line.startswith('#') and ':' in line:
+                    parts = line.strip('# ').split(':')
+                    if len(parts) == 2:
+                        key = parts[0].strip()
+                        if (key.startswith('-')):
+                            key = key[1:].strip()
+                        try:
+                            params[key] = float(parts[1].strip())
+                        except ValueError:
+                            params[key] = parts[1].strip()
+    
+    df['Disc.Radius'] = hyperbolic_to_mercator(kappa_to_hyperbolic(df['Inf.Kappa'], params['kappa_min']), params['nb. vertices'], params['mu'], params['kappa_min'])
+    
+    R = df['Disc.Radius']
     theta = df['Inf.Theta']
-    df['Disc.X'] = df['Disc.Radius'] * np.cos(theta)
-    df['Disc.Y'] = df['Disc.Radius'] * np.sin(theta)
+    df['x0'] = (1+R**2)/(1-R**2)
+    df['x1'] = 2*R*np.cos(theta)/(1-R**2)
+    df['x2'] = 2*R*np.sin(theta)/(1-R**2)
 
+    df['Verifi'] = -df['x0']**2+df['x1']**2+df['x2']**2
+    df['Disc.X'] = df['Disc.Radius']*np.cos(df['Inf.Theta'])
+    df['Disc.Y'] = df['Disc.Radius']*np.sin(df['Inf.Theta'])
+    
     return G, df, params
 
 def read_events_data(events_file):
@@ -123,7 +165,7 @@ def read_events_data(events_file):
 def mercator_epidemic_disc(data, susceptible_coords, infected_coords, recovered_coords,
                            filename=None, time=None):
     """Dibuja los puntos susceptibles, infectados y recuperados en el disco."""
-    fig = Figure(figsize=(14, 12), dpi=100)
+    fig = Figure(dpi=200, figsize=(5, 5))
     ax = fig.add_subplot(111)
 
     # Preparar coordenadas
@@ -137,18 +179,23 @@ def mercator_epidemic_disc(data, susceptible_coords, infected_coords, recovered_
     x_inf, y_inf = unpack(infected_coords)
     x_rec, y_rec = unpack(recovered_coords)
 
-    max_val = np.max(np.abs([data['Disc.X'], data['Disc.Y']])) * 1.1
-    ax.set_xlim(-max_val, max_val)
-    ax.set_ylim(-max_val, max_val)
+    max_val = np.max(np.abs([data['Disc.X'], data['Disc.Y']]))
+    maxlims = max_val* 1.1
+    ax.set_xlim(-maxlims, maxlims)
+    ax.set_ylim(-maxlims, maxlims)
 
-    ax.scatter(x_sus, y_sus, s=15, alpha=0.5, linewidth=0.3, c='white', edgecolors='black')
-    ax.scatter(x_inf, y_inf, s=15, c='red')
-    ax.scatter(x_rec, y_rec, s=15, alpha=0.1, c='blue')
+    ax.scatter(x_sus, y_sus, s=20, alpha=0.5, linewidth=0.3, c='white', edgecolors='black')
+    ax.scatter(x_inf, y_inf, s=20, c='red')
+    ax.scatter(x_rec, y_rec, s=20, alpha=0.1, c='blue')
 
     if time is not None:
-        ax.set_title(f"t={time:.03f}")
-    ax.grid(True, alpha=0.3)
+        ax.annotate(f't={time:.3f} s', (-max_val, max_val))
+
+    # ax.grid(True, alpha=0.3)
+    ax.grid(False)
+    ax.set_aspect('equal')
     fig.tight_layout()
+    ax.set_axis_off()
 
     if filename:
         canvas = FigureCanvasAgg(fig)
