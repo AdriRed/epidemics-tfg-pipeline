@@ -40,7 +40,6 @@ def mercator_disc_epidemic_anim(
     from tqdm import tqdm
     from . import figures as figs
     from . import boost as boost
-    from . import data as data
     import numpy as np
     # ---------- Limpieza y preparación del directorio ----------
     if os.path.exists(epidemics_fig_output):

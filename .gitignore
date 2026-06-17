@@ -15,3 +15,4 @@ statistics-nets/*
 *.png
 *.tex
 slides-nets/*
+frames/*

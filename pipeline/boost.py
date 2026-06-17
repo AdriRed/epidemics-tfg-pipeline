@@ -1,39 +1,3 @@
-
-def hyperbolic_boost(df, center_node):
-    import numpy as np
-    df_new = df.copy()
-    # R = df['Disc.Radius']/max(df['Disc.Radius'])
-    x0, x1, x2 = df['x0'], df['x1'], df['x2']
-    disc_center = df[df['Vertex'] == center_node].iloc[0]
-    phi, alpha, = np.acosh(disc_center['x0']), disc_center['Inf.Theta']
-
-    x1_rot = x1 * np.cos(alpha) + x2 * np.sin(alpha)
-    x2_rot = -x1 * np.sin(alpha) + x2 * np.cos(alpha)
-
-    cosh_phi, sinh_phi = np.cosh(phi), np.sinh(phi)
-    x0_new = cosh_phi * x0 + sinh_phi * x1_rot
-    x1_new_rot = sinh_phi * x0 + cosh_phi * x1_rot
-    x2_new_rot = x2_rot
-    
-    # Rotar de vuelta
-    x1_new = x1_new_rot * np.cos(alpha) - x2_new_rot * np.sin(alpha)
-    x2_new = x1_new_rot * np.sin(alpha) + x2_new_rot * np.cos(alpha)
-    
-    # Volver a disco de Poincaré
-    R_new = np.sqrt(x1_new**2 + x2_new**2) / (1 + x0_new)
-    theta_new = np.arctan2(x2_new, x1_new)
-    df_new['x0'] = x0_new
-    df_new['x1'] = x1_new
-    df_new['x2'] = x2_new
-    df_new['Disc.Radius'] = R_new
-    df_new['Inf.Theta'] = theta_new
-    df_new['Verifi'] = -df_new['x0']**2+df_new['x1']**2+df_new['x2']**2
-    df_new['Disc.X'] = df_new['Disc.Radius']*np.cos(df_new['Inf.Theta'])
-    df_new['Disc.Y'] = df_new['Disc.Radius']*np.sin(df_new['Inf.Theta'])
-    df_new
-
-    return df_new
-        
 def centrar_en_origen(r, theta, r_centro, theta_centro, zeta=1.0):
     """
     Aplica una isometría hiperbólica que mueve (r_centro, theta_centro) al origen.
