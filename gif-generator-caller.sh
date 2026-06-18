@@ -5,8 +5,11 @@
 #   bash generate_epidemic_gif.sh
 # =============================================================================
 export LC_NUMERIC=C
+
+SCRIPT="gif-generator-events.py"
+
 # ---------- Directorios y nombres base ----------
-BASE_DIR="generated-nets"               # carpeta raíz de los datos
+BASE_DIR="generated-nets-2"               # carpeta raíz de los datos
 MODEL="s1h2"                            # tipo de modelo (s1h2, etc.)
 SEED_MODEL=12345                        # semilla del grafo
 N=1000                                  # número de nodos
@@ -20,7 +23,7 @@ B=2.1                                   # exponente de clustering (beta)
 COORD_TYPE="gen_coord"
 
 # ---------- Parámetros de la epidemia ----------
-EPIDEMIC_DIR="targeted-epidemics"       # subcarpeta de eventos
+EPIDEMIC_DIR="epidemic_-1x10^-1"       # subcarpeta de eventos
 WEIGHTED=true                           # epidemia sobre grafo pesado (true/false)
 MODEL_TYPE="SIR"                        # modelo epidémico: SIR, SIS...
 I_RATE=1.0                              # tasa de infección
@@ -29,7 +32,7 @@ SEED_EPIDEMIC=42089                     # semilla de la epidemia
 START_NODE=510                          # nodo inicial (sin ceros a la izquierda)
 
 # ---------- Carpeta de salida de frames ----------
-OUTPUT_DIR="./frames-2"
+OUTPUT_DIR="./frames-events-sn=510"
 
 # ---------- Parámetros de la animación ----------
 T_START=0
@@ -75,7 +78,7 @@ $WEIGHTED && WEIGHT_FLAG="w" || WEIGHT_FLAG=""
 # Ajustar formato de números: 1.00000 1.00000, semilla con 5 dígitos...
 I_FMT=$(printf "%10.5f" $I_RATE)
 R_FMT=$(printf "%10.5f" $R_RATE)
-SEED_FMT=$(printf "%5d" $SEED_EPIDEMIC)
+SEED_FMT=$(printf "%10d" $SEED_EPIDEMIC)
 SN_FMT=$(printf "%05d" $START_NODE)
 
 EVENTS_NAME="events-${FULL_MODEL_NAME}-${WEIGHT_FLAG}${MODEL_TYPE}-I=${I_FMT}-R=${R_FMT}-S=${SEED_FMT}-SN=${SN_FMT}.dat"
@@ -92,7 +95,7 @@ if [ -n "$BOOST_NODE" ]; then
     BOOST_ARG="--boost $BOOST_NODE"
 fi
 
-python gif-generator.py \
+python "$SCRIPT" \
     "$COORDS_FILE" \
     "$EDGES_FILE" \
     "$EVENTS_FILE" \
