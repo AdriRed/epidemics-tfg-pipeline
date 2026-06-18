@@ -3,7 +3,7 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 
-def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R: float =None, c: float =None, title: str = None, linecolor='#00000045'):
+def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [], net: nx.Graph = None, isolines_nodes: list[str] = None, R: float =None, c: float =None, title: str = None, linecolor='#00000045', nodesize=15):
     positions = {v: (x, y) for _, (v, x, y) in data[['Vertex', 'Disc.X', 'Disc.Y']].iterrows()}
     kappa_vals = np.log10(data['Inf.Kappa'])
     x_orig, y_orig = zip(*positions.values())
@@ -19,7 +19,7 @@ def mercator_disc_ax(ax: plt.Axes, data: pd.DataFrame, mark_nodes: list[str] = [
     
     # NODOS: zorder muy alto
     scatter = ax.scatter(x_orig, y_orig, c=kappa_vals, cmap='viridis', 
-                        s=15, edgecolors='black', linewidth=0.3,
+                        s=nodesize, edgecolors='black', linewidth=0.3,
                         zorder=10)  # <- Encima de las aristas
     
     # NODOS MARCADOS: zorder aún más alto
