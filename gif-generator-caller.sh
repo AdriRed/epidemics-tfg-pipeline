@@ -6,7 +6,7 @@
 # =============================================================================
 export LC_NUMERIC=C
 
-SCRIPT="gif-generator-events.py"
+SCRIPT="gif-generator-events-bh.py"
 
 # ---------- Directorios y nombres base ----------
 BASE_DIR="generated-nets-2"               # carpeta raíz de los datos
@@ -29,18 +29,18 @@ MODEL_TYPE="SIR"                        # modelo epidémico: SIR, SIS...
 I_RATE=1.0                              # tasa de infección
 R_RATE=1.0                              # tasa de recuperación
 SEED_EPIDEMIC=42089                     # semilla de la epidemia
-START_NODE=510                          # nodo inicial (sin ceros a la izquierda)
+START_NODE=271                          # nodo inicial (sin ceros a la izquierda)
 
 # ---------- Carpeta de salida de frames ----------
-OUTPUT_DIR="./frames-events-sn=510"
+OUTPUT_DIR="./bh-events-sn=271"
 
 # ---------- Parámetros de la animación ----------
 T_START=0
-T_END=3
+T_END=1.5
 STEP=0.005
 PARALLEL="--parallel"                   # pon "" si no quieres paralelo
 MAX_WORKERS=8                           # solo si usas --parallel
-BOOST_NODE=
+BOOST_NODE=271
 
 # ---------- Parámetros de salida de vídeo / GIF ----------
 FRAMERATE=15

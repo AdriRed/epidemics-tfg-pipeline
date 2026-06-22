@@ -16,3 +16,4 @@ statistics-nets/*
 *.tex
 slides-nets/*
 frames*/*
+bh-*
