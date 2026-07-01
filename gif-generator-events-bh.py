@@ -84,7 +84,7 @@ def centrar_en_origen(r, theta, r_centro, theta_centro, zeta=1.0):
 # =============================================================================
 def read_hyperbolic_data(archivo_coords: str, archivo_edges: str):
     """Lee el grafo y las coordenadas hiperbólicas del formato S1/H2."""
-    G = nx.read_edgelist(archivo_edges)
+    G = nx.read_weighted_edgelist(archivo_edges+"_weight_-1x10^-1")
     gen_coord = 'gen_coord' in archivo_coords
 
     if gen_coord:
@@ -138,7 +138,9 @@ def read_hyperbolic_data(archivo_coords: str, archivo_edges: str):
 
     # Calcular distancias hiperbólicas para las aristas
     # (asumiendo que la distancia ya está en G[u][v]['distance'] o la calculamos)
-    # Si no existe, la calculamos con las coordenadas.
+    # Si no existe, la calculamos con las coordenadas
+    total_dist = 0
+    total_weight = 0
     for u, v in G.edges():
         if 'distance' not in G[u][v]:
             u_row = df[df['Vertex'] == str(u)].iloc[0]
@@ -150,6 +152,11 @@ def read_hyperbolic_data(archivo_coords: str, archivo_edges: str):
             delta_theta = abs(theta_u - theta_v)
             dist = hyperbolic_distance_og(r_u, r_v, delta_theta)
             G[u][v]['distance'] = dist
+            total_weight += G[u][v]['weight']
+            total_dist += dist
+    
+    for u, v in G.edges():
+        G[u][v]['D_ij'] = 1 - np.log(G[u][v]['weight']/total_weight)
 
     return G, df, params
 
@@ -330,7 +337,7 @@ def generate_epidemic_frames(df, G: nx.Graph, events, output_dir, step=0.1, t_st
 
     print(f"Nodo raíz (centro): {root}")
     # 2. Calcular layout radial
-    pos = radial_layout_brockmann_helbing(G, root, weight='distance', scale=0.9)
+    pos = radial_layout_brockmann_helbing(G, root, weight='D_ij', scale=0.9)
     
     # 3. Mapeo rápido de coordenadas radiales
     x_arr = np.array([pos[v][0] for v in G.nodes()])

@@ -29,10 +29,10 @@ MODEL_TYPE="SIR"                        # modelo epidémico: SIR, SIS...
 I_RATE=1.0                              # tasa de infección
 R_RATE=1.0                              # tasa de recuperación
 SEED_EPIDEMIC=42089                     # semilla de la epidemia
-START_NODE=271                          # nodo inicial (sin ceros a la izquierda)
+START_NODE=875                          # nodo inicial (sin ceros a la izquierda)
 
 # ---------- Carpeta de salida de frames ----------
-OUTPUT_DIR="./bh-events-sn=271"
+OUTPUT_DIR="./bh-events-sn=875"
 
 # ---------- Parámetros de la animación ----------
 T_START=0
@@ -40,7 +40,7 @@ T_END=1.5
 STEP=0.005
 PARALLEL="--parallel"                   # pon "" si no quieres paralelo
 MAX_WORKERS=8                           # solo si usas --parallel
-BOOST_NODE=271
+BOOST_NODE=875
 
 # ---------- Parámetros de salida de vídeo / GIF ----------
 FRAMERATE=15
